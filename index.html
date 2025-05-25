@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tıbbi Sekreter Asistanı</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+    }
+
+    #chat-icon {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background-color: #4DA8DA;
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      border: 2px solid white;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    #chat-icon img {
+      width: 40px;
+      height: 40px;
+    }
+
+    #chat-popup {
+      display: none;
+      position: fixed;
+      bottom: 120px;
+      right: 30px;
+      width: 340px;
+      background-color: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      padding: 16px;
+      z-index: 999;
+      transition: all 0.3s ease-in-out;
+    }
+
+    #chat-popup::before {
+      content: "";
+      position: absolute;
+      bottom: -10px;
+      right: 25px;
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 10px solid #ffffff;
+    }
+
+    #chat-window {
+      height: 280px;
+      overflow-y: auto;
+      padding: 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background-color: #fafafa;
+      margin-bottom: 12px;
+    }
+
+    #user-input {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-bottom: 8px;
+      box-sizing: border-box;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #4DA8DA;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #3c93bd;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="chat-icon" onclick="toggleChat()">
+    <img src="https://cdn-icons-png.flaticon.com/512/2920/2920087.png" alt="Asistan">
+  </div>
+
+  <div id="chat-popup">
+    <div id="chat-window"></div>
+    <input type="text" id="user-input" placeholder="Mesajınızı yazın..." />
+    <button onclick="sendMessage()">Gönder</button>
+  </div>
+
+  <script>
+    function toggleChat() {
+      const chat = document.getElementById("chat-popup");
+      chat.style.display = chat.style.display === "none" ? "block" : "none";
+    }
+
+    function appendMessage(sender, text) {
+      const chatWindow = document.getElementById("chat-window");
+      const messageElement = document.createElement("p");
+      messageElement.innerHTML = `<strong>${sender}:</strong> `;
+      chatWindow.appendChild(messageElement);
+
+      let index = 0;
+      const interval = setInterval(() => {
+        if (index < text.length) {
+          messageElement.innerHTML += text.charAt(index);
+          index++;
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        } else {
+          clearInterval(interval);
+        }
+      }, 30); // harf hızı (ms)
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("user-input");
+      const message = input.value.trim();
+      if (!message) return;
+
+      appendMessage("Siz", message);
+      input.value = "";
+
+      try {
+        const response = await fetch("http://localhost:5000/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: message })
+        });
+
+        const data = await response.json();
+        appendMessage("Asistan", data.reply);
+      } catch (error) {
+        appendMessage("Asistan", "Sunucuya bağlanılamadı.");
+      }
+    }
+  </script>
+</body>
+</html>

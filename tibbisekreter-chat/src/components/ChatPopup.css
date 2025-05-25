@@ -1,0 +1,146 @@
+.chat-icon {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background-color: #4DA8DA;
+  color: white;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 1000;
+  transition: box-shadow 0.3s ease;
+}
+
+/* 🔄 Yeni mesaj bildirimi geldiğinde parlayan sınıf */
+.chat-icon.pulse {
+  animation: bounce 1s infinite, glow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px #4DA8DA;
+  }
+  to {
+    box-shadow: 0 0 20px #4DA8DA;
+  }
+}
+
+/* 🔔 Simge üstünde 1 yazısı */
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: red;
+  color: white;
+  font-size: 12px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  animation: badge-pulse 1.5s infinite;
+}
+
+@keyframes badge-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- Devamı eskisi gibi --- */
+
+.chat-popup {
+  position: fixed;
+  bottom: 110px;
+  right: 30px;
+  width: 320px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 999;
+}
+
+.chat-window {
+  height: 240px;
+  overflow-y: auto;
+  background: #fafafa;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background-color: #4DA8DA;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.message {
+  max-width: 80%;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 16px;
+  line-height: 1.4;
+  font-size: 14px;
+  display: inline-block;
+  word-wrap: break-word;
+}
+
+.message.user {
+  background-color: #dcf8c6; /* yeşilimsi */
+  align-self: flex-end;
+  text-align: right;
+  border-bottom-right-radius: 0;
+}
+
+.message.bot {
+  background-color: #ffffff; /* beyaz */
+  border: 1px solid #ddd;
+  align-self: flex-start;
+  text-align: left;
+  border-bottom-left-radius: 0;
+}
+
+.chat-window {
+  display: flex;
+  flex-direction: column;
+}

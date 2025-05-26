@@ -1,10 +1,10 @@
 import React from 'react';
-import ChatPopup from './components/ChatPopup';
+import HospitalMock from './components/HospitalMock'; // Arka plan + ChatPopup birlikte
 
 function App() {
   return (
     <div className="App">
-      <ChatPopup />
+      <HospitalMock />
     </div>
   );
 }

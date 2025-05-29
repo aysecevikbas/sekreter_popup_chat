@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime, timedelta
+import sqlite3
 import json
 
 # .env dosyasını yükle
@@ -14,11 +15,11 @@ load_dotenv(dotenv_path=env_path)
 app = Flask(__name__)
 CORS(app)
 
-# OpenAI API anahtarını yükle
+# OpenAI API anahtarı
 openai.api_key = os.getenv("OPENAI_API_KEY")
 print("✅ API Key yüklendi mi? :", openai.api_key is not None)
 
-# 🔐 Haftalık log temizlemeli log kaydı fonksiyonu
+# ✅ Logları hem veritabanına hem log.json'a yaz ve 7 günden eski kayıtları sil
 def log_interaction(user_input, response):
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -26,37 +27,50 @@ def log_interaction(user_input, response):
         "response": response
     }
 
-    logs = []
-    if os.path.exists("log.json"):
-        with open("log.json", "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    logs.append(json.loads(line))
-                except:
-                    continue
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
-    # Eğer eski loglar varsa ve en eskisi 7 günden önceyse logları temizle
-    if logs:
-        try:
-            oldest_time = datetime.fromisoformat(logs[0]["timestamp"])
-            if datetime.utcnow() - oldest_time > timedelta(days=7):
-                print("🧹 7 günden eski loglar silindi.")
-                logs = []
-        except Exception as e:
-            print("⚠️ Tarih formatı okunamadı, loglar sıfırlanmadı:", e)
-
-    logs.append(log_entry)
-
-    # Dosyaya yeniden yaz
+    # 📁 Veritabanına yaz ve eski kayıtları sil
     try:
+        db_path = os.path.join(os.path.dirname(__file__), 'logs.db')
+        print("📁 DB yolu:", db_path)
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        # 7 günden eski verileri sil
+        c.execute("DELETE FROM logs WHERE timestamp < ?", (seven_days_ago.isoformat(),))
+
+        # Yeni logu ekle
+        c.execute("INSERT INTO logs (question, answer) VALUES (?, ?)", (user_input, response))
+        conn.commit()
+        conn.close()
+        print("✅ Veritabanına log yazıldı ve eski kayıtlar silindi.")
+    except Exception as e:
+        print("❌ Veritabanına yazma hatası:", e)
+
+    # 📝 log.json'a yaz ve eski kayıtları temizle
+    try:
+        logs = []
+        if os.path.exists("log.json"):
+            with open("log.json", "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        entry_time = datetime.fromisoformat(entry.get("timestamp", ""))
+                        if entry_time > seven_days_ago:
+                            logs.append(entry)
+                    except Exception:
+                        continue  # bozuk satır varsa geç
+
+        logs.append(log_entry)
+
         with open("log.json", "w", encoding="utf-8") as f:
             for entry in logs:
                 f.write(json.dumps(entry) + "\n")
-        print("📌 Log eklendi:", log_entry)
+        print("📝 log.json'a da yazıldı ve eski kayıtlar temizlendi.")
     except Exception as e:
-        print("❌ Log dosyasına yazarken hata:", e)
+        print("❌ log.json yazım hatası:", e)
 
-# Ana sohbet endpoint'i
+# 🔮 Ana sohbet endpoint
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -73,25 +87,23 @@ def chat():
     except Exception as e:
         return jsonify({"reply": f"Hata oluştu: {str(e)}"})
 
-# Logları döndüren endpoint
+# 📤 Veritabanından logları dönen endpoint
 @app.route("/logs", methods=["GET"])
 def get_logs():
-    logs = []
     try:
-        with open("log.json", "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    logs.append(json.loads(line))
-                except Exception as e:
-                    print("❌ Bozuk log satırı atlandı:", e)
-    except FileNotFoundError:
-        return jsonify({"logs": []})
+        db_path = os.path.join(os.path.dirname(__file__), 'logs.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT question, answer, timestamp FROM logs ORDER BY id DESC")
+        rows = c.fetchall()
+        conn.close()
+
+        logs = [{"question": row[0], "answer": row[1], "timestamp": row[2]} for row in rows]
+        return jsonify({"logs": logs})
     except Exception as e:
-        print("❌ Loglar okunurken hata:", e)
+        print("❌ Logları okurken hata:", e)
         return jsonify({"logs": []})
 
-    return jsonify({"logs": logs})
-
-# Sunucuyu başlat
+# 🚀 Uygulamayı başlat
 if __name__ == "__main__":
     app.run(port=5000)

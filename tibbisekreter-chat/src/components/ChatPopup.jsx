@@ -1,23 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChatIcon from './ChatIcon';
 import ChatInput from './ChatInput';
 import './ChatPopup.css';
 
-function ChatPopup() {
+const ChatPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  const chatWindowRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && chatWindowRef.current) {
+      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+    }
+  }, [messages, isOpen]);
+
   const toggleChat = () => {
-    setIsOpen(!isOpen);
+    setIsOpen(prev => !prev);
     setHasNewMessage(false);
   };
 
   const playNotificationSound = () => {
-    const audio = new Audio(process.env.PUBLIC_URL + "/sounds/oringz-w427-371.mp3");
-    audio.play().catch(e => console.error("Ses çalınamadı:", e));
+    const audio = new Audio(`${process.env.PUBLIC_URL}/sounds/oringz-w427-371.mp3`);
+    audio.play().catch(e => console.error('Ses çalınamadı:', e));
   };
 
   const handleSend = async () => {
@@ -25,21 +33,23 @@ function ChatPopup() {
 
     setIsSending(true);
 
-    const newMessages = [...messages, { sender: "Siz", text: input }];
-    setMessages(newMessages);
-    setInput("");
+    const userMessage = { sender: 'Siz', text: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
 
     try {
-      const response = await fetch("/chat", {  // 🔁 burada güncellendi
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: input })
+      const response = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: input }),
       });
 
       const data = await response.json();
       const reply = data.reply;
 
-      let currentText = "";
+      setMessages(prev => [...prev, { sender: 'Asistan', text: '' }]);
+
+      let currentText = '';
       let index = 0;
 
       const typeNextChar = () => {
@@ -47,12 +57,7 @@ function ChatPopup() {
           currentText += reply[index];
           setMessages(prev => {
             const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.sender === "Asistan") {
-              updated[updated.length - 1] = { ...last, text: currentText };
-            } else {
-              updated.push({ sender: "Asistan", text: currentText });
-            }
+            updated[updated.length - 1].text = currentText;
             return updated;
           });
           index++;
@@ -64,8 +69,9 @@ function ChatPopup() {
       setHasNewMessage(true);
       typeNextChar();
 
-    } catch {
-      setMessages(prev => [...prev, { sender: "Asistan", text: "Sunucuya bağlanılamadı." }]);
+    } catch (error) {
+      console.error('Hata:', error);
+      setMessages(prev => [...prev, { sender: 'Asistan', text: 'Sunucuya bağlanılamadı.' }]);
     } finally {
       setIsSending(false);
     }
@@ -76,12 +82,9 @@ function ChatPopup() {
       <ChatIcon onClick={toggleChat} hasNewMessage={hasNewMessage} />
       {isOpen && (
         <div className="chat-popup">
-          <div className="chat-window">
+          <div className="chat-window" ref={chatWindowRef}>
             {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`message ${msg.sender === "Siz" ? "user" : "bot"}`}
-              >
+              <div key={idx} className={`message ${msg.sender === 'Siz' ? 'user' : 'bot'}`}>
                 {msg.text}
               </div>
             ))}
@@ -96,6 +99,6 @@ function ChatPopup() {
       )}
     </>
   );
-}
+};
 
 export default ChatPopup;

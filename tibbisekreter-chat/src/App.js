@@ -1,12 +1,27 @@
 import React from 'react';
-import HospitalMock from './components/HospitalMock'; // Arka plan + ChatPopup birlikte
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import HospitalMock from './components/HospitalMock';
+import LogChart from './components/LogChart';
 
-function App() {
+// Ana uygulama bileşeni
+const App = () => {
   return (
-    <div className="App">
-      <HospitalMock />
-    </div>
+    <Router>
+      <div className="App">
+        {/* Uygulama navigasyonu */}
+        <nav style={{ padding: '10px', background: '#f4f4f4', display: 'flex', gap: '20px' }}>
+          <Link to="/">💬 Chat</Link>
+          <Link to="/istatistikler">📊 İstatistikler</Link>
+        </nav>
+
+        {/* Sayfa içerikleri burada gösterilecek */}
+        <Routes>
+          <Route path="/" element={<HospitalMock />} />
+          <Route path="/istatistikler" element={<LogChart />} />
+        </Routes>
+      </div>
+    </Router>
   );
-}
+};
 
 export default App;

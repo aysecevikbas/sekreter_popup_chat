@@ -33,12 +33,13 @@ const ChatPopup = () => {
 
     setIsSending(true);
 
+    const apiUrl = process.env.REACT_APP_API_URL || '';
     const userMessage = { sender: 'Siz', text: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
 
     try {
-      const response = await fetch('/chat', {
+      const response = await fetch(`${apiUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: input }),

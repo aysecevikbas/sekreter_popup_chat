@@ -7,13 +7,14 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import sqlite3
 import json
+import re
 
 # .env dosyasını yükle
 env_path = Path(__file__).resolve().parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
 # OpenAI API anahtarı
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -104,6 +105,157 @@ def get_logs():
         print("❌ Logları okurken hata:", e)
         return jsonify({"logs": []})
 
+def categorize_question(question):
+    """
+    Soruyu içeriğine göre kategorilere ayıran fonksiyon
+    """
+    question_lower = question.lower()
+    
+    # Acil durum kategorisi
+    acil_keywords = ['acil', 'bayıldı', 'nefes', 'göğüs ağrısı', 'kalp', 'kan', 'ateş', 'kusma', 'baş dönmesi', 'nabız']
+    if any(keyword in question_lower for keyword in acil_keywords):
+        return 'Acil Durum'
+    
+    # Randevu kategorisi
+    randevu_keywords = ['randevu', 'appointment', 'doktor', 'muayene', 'görüşme', 'zaman']
+    if any(keyword in question_lower for keyword in randevu_keywords):
+        return 'Randevu'
+    
+    # Yönlendirme kategorisi
+    yonlendirme_keywords = ['nerede', 'nasıl', 'hangi', 'bölüm', 'kat', 'yol', 'adres']
+    if any(keyword in question_lower for keyword in yonlendirme_keywords):
+        return 'Yönlendirme'
+    
+    # Hasta bakımı kategorisi
+    bakim_keywords = ['hasta', 'bakım', 'tedavi', 'ilaç', 'beslenme', 'hijyen']
+    if any(keyword in question_lower for keyword in bakim_keywords):
+        return 'Hasta Bakımı'
+    
+    # Bilgi talep kategorisi
+    bilgi_keywords = ['bilgi', 'öğren', 'anlat', 'açıkla', 'nedir', 'nasıl']
+    if any(keyword in question_lower for keyword in bilgi_keywords):
+        return 'Bilgi Talebi'
+    
+    # Teşekkür kategorisi
+    tesekkur_keywords = ['teşekkür', 'sağol', 'mersi', 'thanks']
+    if any(keyword in question_lower for keyword in tesekkur_keywords):
+        return 'Teşekkür'
+    
+    return 'Genel'
+
+@app.route('/api/stats/weekly', methods=['GET'])
+def get_weekly_stats():
+    """
+    Son 7 güne ait istatistikleri döndüren API endpoint
+    """
+    try:
+        # Son 7 günün tarih aralığını hesapla
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=7)
+        
+        # Veritabanından son 7 günün verilerini çek
+        conn = sqlite3.connect('logs.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT question, answer, timestamp 
+            FROM logs 
+            WHERE timestamp >= ? 
+            ORDER BY timestamp DESC
+        ''', (start_date.strftime('%Y-%m-%d %H:%M:%S'),))
+        
+        weekly_logs = cursor.fetchall()
+        conn.close()
+        
+        # Kategorilere göre grupla
+        category_counts = {}
+        daily_counts = {}
+        
+        for question, answer, timestamp in weekly_logs:
+            # Kategori belirle
+            category = categorize_question(question)
+            category_counts[category] = category_counts.get(category, 0) + 1
+            
+            # Günlük sayım için tarihi al
+            date_only = timestamp.split(' ')[0]
+            daily_counts[date_only] = daily_counts.get(date_only, 0) + 1
+        
+        # Son 7 günün tarihlerini oluştur
+        date_range = []
+        for i in range(7):
+            date = (end_date - timedelta(days=i)).strftime('%Y-%m-%d')
+            date_range.append({
+                'date': date,
+                'count': daily_counts.get(date, 0)
+            })
+        
+        # Kategori verilerini formatla
+        categories = [{'name': k, 'value': v} for k, v in category_counts.items()]
+        
+        return jsonify({
+            'success': True,
+            'period': 'weekly',
+            'total_questions': len(weekly_logs),
+            'categories': categories,
+            'daily_trend': list(reversed(date_range)),
+            'date_range': {
+                'start': start_date.strftime('%Y-%m-%d'),
+                'end': end_date.strftime('%Y-%m-%d')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stats/all', methods=['GET'])
+def get_all_time_stats():
+    """
+    Tüm zamanların istatistiklerini döndüren API endpoint
+    """
+    try:
+        # Veritabanından tüm verileri çek
+        conn = sqlite3.connect('logs.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT question, answer, timestamp FROM logs ORDER BY timestamp DESC')
+        all_logs = cursor.fetchall()
+        conn.close()
+        
+        # Kategorilere göre grupla
+        category_counts = {}
+        monthly_counts = {}
+        
+        for question, answer, timestamp in all_logs:
+            # Kategori belirle
+            category = categorize_question(question)
+            category_counts[category] = category_counts.get(category, 0) + 1
+            
+            # Aylık sayım için yıl-ay al
+            try:
+                month_key = timestamp[:7]  # YYYY-MM formatı
+                monthly_counts[month_key] = monthly_counts.get(month_key, 0) + 1
+            except:
+                pass
+        
+        # Kategori verilerini formatla
+        categories = [{'name': k, 'value': v} for k, v in category_counts.items()]
+        
+        # Aylık trend verilerini formatla
+        monthly_trend = [{'month': k, 'count': v} for k, v in sorted(monthly_counts.items())]
+        
+        return jsonify({
+            'success': True,
+            'period': 'all_time',
+            'total_questions': len(all_logs),
+            'categories': categories,
+            'monthly_trend': monthly_trend,
+            'first_record': all_logs[-1][2] if all_logs else None,
+            'last_record': all_logs[0][2] if all_logs else None
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # 🚀 Uygulamayı başlat
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(host='0.0.0.0', port=5001, debug=True)
